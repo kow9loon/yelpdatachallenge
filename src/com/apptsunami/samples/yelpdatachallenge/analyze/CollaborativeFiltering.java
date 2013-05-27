@@ -60,7 +60,11 @@ public class CollaborativeFiltering extends DatabaseOperation {
 	 * noise
 	 */
 	private static final double MINIMUM_PCC_THRESHOLD = 0.2;
-
+	/*
+	 * No need to cache after applying collection index. Otherwise we need to
+	 * increase the jvm run time memory.
+	 */
+	private static final boolean CACHE_REVIEW_IN_MEMORY = false;
 	/*
 	 * A cache to look up all reviews by a user id
 	 */
@@ -76,7 +80,7 @@ public class CollaborativeFiltering extends DatabaseOperation {
 		public int stars = 0; // actual
 		public int totalUserCount = 0; // total number of similar users
 		public int actualUserCount = 0; // actual no. used to calculate
-										// prediction
+		// prediction
 		public Double predictedStars = null; // prediction
 
 		public String toString() {
@@ -272,9 +276,12 @@ public class CollaborativeFiltering extends DatabaseOperation {
 	 */
 	private HashMap<String, DBObject> findUserReviews(DBObject reviewObject) {
 		String userId = (String) reviewObject.get(KEY_USER_ID);
-		HashMap<String, DBObject> reviewArray = userReviewHash.get(userId);
-		if (reviewArray != null) {
-			return reviewArray;
+		HashMap<String, DBObject> reviewArray = null;
+		if (CACHE_REVIEW_IN_MEMORY) {
+			reviewArray = userReviewHash.get(userId);
+			if (reviewArray != null) {
+				return reviewArray;
+			} // if
 		} // if
 		reviewArray = new HashMap<String, DBObject>();
 		/* search for all reviews by the user id */
@@ -288,7 +295,9 @@ public class CollaborativeFiltering extends DatabaseOperation {
 			reviewArray.put((String) reviewObject3.get(KEY_BUSINESS_ID),
 					reviewObject3);
 		} // while
-		userReviewHash.put(userId, reviewArray);
+		if (CACHE_REVIEW_IN_MEMORY) {
+			userReviewHash.put(userId, reviewArray);
+		}
 		return reviewArray;
 	} // findUserReviews
 
@@ -524,6 +533,16 @@ public class CollaborativeFiltering extends DatabaseOperation {
 	} // summarizeResult
 
 	/**
+	 * Ensure that user id and business id have performance index
+	 * 
+	 * @param coll
+	 */
+	private void ensureIndex(DBCollection coll) {
+		coll.ensureIndex(KEY_USER_ID);
+		coll.ensureIndex(KEY_BUSINESS_ID);
+	} // ensureIndex
+
+	/**
 	 * Finds all reviews according to the filter and executes the collaborative
 	 * filtering algorithm on each review object found
 	 * 
@@ -536,6 +555,7 @@ public class CollaborativeFiltering extends DatabaseOperation {
 		if (coll == null) {
 			throw new Exception("Cannot get collection " + COLLECTION_REVIEW);
 		}
+		ensureIndex(coll);
 		DBCursor cursorReview = coll.find(filter);
 		ArrayList<RatingResult> ratingResultArray = new ArrayList<RatingResult>();
 		while (cursorReview.hasNext()) {
