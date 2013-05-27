@@ -500,10 +500,8 @@ public class CollaborativeFiltering extends DatabaseOperation {
 		System.out.println(ratingResult);
 		if (ratingResult.predictedStars == null) {
 			System.out.println("Insufficient data to predict rating");
-			return null;
-		} else {
-			return ratingResult;
 		}
+		return ratingResult;
 	} // predictUserRating
 
 	/**
@@ -515,21 +513,32 @@ public class CollaborativeFiltering extends DatabaseOperation {
 	 *            object
 	 */
 	private void analyzeAccuracy(ArrayList<RatingResult> ratingResultArray) {
-		Double totalSquare = 0.0;
-		int count = 0;
+		double totalSquare = 0.0;
+		int predictionCount = 0;
+		int noPredictionCount = 0;
 		Iterator<RatingResult> itr = ratingResultArray.iterator();
 		while (itr.hasNext()) {
 			RatingResult ratingResult = itr.next();
-			Double error = ratingResult.predictedStars - ratingResult.stars;
-			totalSquare += error * error;
-			count++;
+			if (ratingResult.predictedStars == null) {
+				noPredictionCount++;
+			} else {
+				double error = ratingResult.predictedStars - ratingResult.stars;
+				totalSquare += error * error;
+				predictionCount++;
+			} // else
 		} // while
-		if (count == 0) {
-			System.out.println("RMS(0)");
-			return;
-		}
-		Double rms = Math.sqrt(totalSquare / count);
-		System.out.println("RMS(" + count + ") = " + rms);
+		int totalCount = noPredictionCount + predictionCount;
+		if (predictionCount == 0) {
+			System.out.println("No prediction predictionPercentage=0(=0/"
+					+ totalCount + ")");
+		} else {
+			double predictionPercentage = ((double) predictionCount)
+					/ totalCount;
+			double rms = Math.sqrt(totalSquare / predictionCount);
+			System.out.println("RMS(" + predictionCount + ")=" + rms
+					+ " predictionPercentage=" + predictionPercentage + "(="
+					+ predictionCount + "/" + totalCount + ")");
+		} // else
 	} // summarizeResult
 
 	/**
