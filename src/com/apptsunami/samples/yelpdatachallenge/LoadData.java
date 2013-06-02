@@ -2,6 +2,7 @@ package com.apptsunami.samples.yelpdatachallenge;
 
 import java.io.File;
 
+import com.apptsunami.samples.yelpdatachallenge.auxData.GenderLoader;
 import com.apptsunami.samples.yelpdatachallenge.parse.ProcessJsonFile;
 
 /**
@@ -42,8 +43,9 @@ public class LoadData {
 	 */
 	public static void main(String[] args) {
 		System.out.println("start");
-		ProcessJsonFile parser = new ProcessJsonFile();
 		try {
+			/* load raw json files */
+			ProcessJsonFile parser = new ProcessJsonFile();
 			parser.openDatabase();
 			for (int i = 0; i < args.length; i++) {
 				System.out.println("loading file " + i + ": " + args[i]);
@@ -53,6 +55,12 @@ public class LoadData {
 						getCollectionNameFromFileName(fileName));
 			} // for
 			parser.closeDatabase();
+			
+			/* enrich user collection by gender probabilities */
+			GenderLoader loadGender = new GenderLoader();
+			loadGender.openDatabase();
+			loadGender.addGenderToUser();
+			loadGender.closeDatabase();
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
