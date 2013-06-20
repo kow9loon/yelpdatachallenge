@@ -75,6 +75,7 @@ public class CollaborativeFiltering extends DatabaseOperation {
 		public int actualUserCount = 0; // actual no. used to calculate
 		// prediction
 		public Double predictedStars = null; // prediction
+		public Double averageRatingStars = null;
 
 		public String toString() {
 			return "{\"userId\":\'"
@@ -263,7 +264,18 @@ public class CollaborativeFiltering extends DatabaseOperation {
 				covariance += deltaX * deltaY;
 				varianceX += deltaX * deltaX;
 				varianceY += deltaY * deltaY;
+				/*
+				 * System.out.println("x=" + xi + " y=" + yi + " deltaX=" +
+				 * deltaX + " deltaY=" + deltaY);
+				 */
 			} // for
+			/*
+			 * System.out.println(xArr); System.out.println(yArr);
+			 * System.out.println("covariance=" + covariance + " averageX=" +
+			 * averageX + " averageY=" + averageY + " varianceX=" + varianceX +
+			 * " varianceY=" + varianceY);
+			 */
+
 			/*
 			 * both the number of data points and the pcc are returned so they
 			 * can considered in user selection
@@ -289,6 +301,9 @@ public class CollaborativeFiltering extends DatabaseOperation {
 			} else {
 				coefficient.pcc = covariance
 						/ (Math.sqrt(varianceX) * Math.sqrt(varianceY));
+				/*
+				 * System.out.println("pcc=" + coefficient.pcc);
+				 */
 			}
 			return coefficient;
 		} // else
@@ -552,6 +567,8 @@ public class CollaborativeFiltering extends DatabaseOperation {
 		ArrayList<ComparableRating> comparableRatingArray = new ArrayList<ComparableRating>();
 		DBCollection userCollection = db.getCollection(COLLECTION_USER);
 		ensureCollectionUserIndex(userCollection);
+		int totalRatingCount = 0;
+		int totalRatingStars = 0;
 		/* for each review of the (original) business */
 		while (cursorReview2.hasNext()) {
 			DBObject reviewObject2 = cursorReview2.next();
@@ -559,6 +576,9 @@ public class CollaborativeFiltering extends DatabaseOperation {
 					.get(CollectionReview.KEY_USER_ID);
 			/* make sure to skip the review by the (original) business */
 			if (!userId2.equals(ratingResult.userId)) {
+				totalRatingCount++;
+				totalRatingStars += (Integer) reviewObject2
+						.get(CollectionReview.KEY_STARS);
 				/* collect all reviews of this other user */
 				HashMap<String, DBObject> reviewArray2 = findUserReviews(reviewObject2);
 				/*
@@ -609,7 +629,15 @@ public class CollaborativeFiltering extends DatabaseOperation {
 			System.out.println("error=" + error + " predictedStars="
 					+ ratingResult.predictedStars + " actualStars="
 					+ ratingResult.stars);
-		}
+		} // else
+		/* naive average rating of the (original) business by all other users */
+		ratingResult.averageRatingStars = (double) totalRatingStars
+				/ (double) totalRatingCount;
+		double arsError = ratingResult.averageRatingStars - ratingResult.stars;
+		System.out.println("averageRatingStars.error="
+				+ Double.toString(arsError) + " averageRatingStars="
+				+ Double.toString(ratingResult.averageRatingStars)
+				+ " actualStars=" + ratingResult.stars);
 		return ratingResult;
 	} // predictUserRating
 
@@ -622,9 +650,18 @@ public class CollaborativeFiltering extends DatabaseOperation {
 	 *            object
 	 */
 	private void analyzeAccuracy(ArrayList<RatingResult> ratingResultArray) {
+
 		double totalSquare = 0.0;
 		int predictionCount = 0;
 		int noPredictionCount = 0;
+
+		double averageStarsTotalSquare = 0.0;
+		int averageStarsCount = 0;
+
+		int midPointStars = (MAXIMUM_STARS + MINIMUM_STARS) / 2;
+		double midPointStarsTotalSquare = 0.0;
+		int midPointStarsCount = 0;
+
 		Iterator<RatingResult> itr = ratingResultArray.iterator();
 		while (itr.hasNext()) {
 			RatingResult ratingResult = itr.next();
@@ -635,6 +672,15 @@ public class CollaborativeFiltering extends DatabaseOperation {
 				totalSquare += error * error;
 				predictionCount++;
 			} // else
+			if (ratingResult.averageRatingStars != null) {
+				double error = ratingResult.averageRatingStars
+						- ratingResult.stars;
+				averageStarsTotalSquare += error * error;
+				averageStarsCount++;
+			} // if
+			double error = midPointStars - ratingResult.stars;
+			midPointStarsTotalSquare += error * error;
+			midPointStarsCount++;
 		} // while
 		int totalCount = noPredictionCount + predictionCount;
 		if (predictionCount == 0) {
@@ -648,6 +694,17 @@ public class CollaborativeFiltering extends DatabaseOperation {
 					+ " predictionPercentage=" + predictionPercentage + "(="
 					+ predictionCount + "/" + totalCount + ")");
 		} // else
+		if (averageStarsCount > 0) {
+			double rms = Math.sqrt(averageStarsTotalSquare / averageStarsCount);
+			System.out.println("averageStarsCount.RMS(" + averageStarsCount
+					+ ")=" + rms);
+		} // if
+		if (midPointStarsCount > 0) {
+			double rms = Math.sqrt(midPointStarsTotalSquare
+					/ midPointStarsCount);
+			System.out.println("midPointStarsCount.RMS(" + midPointStarsCount
+					+ ")=" + rms);
+		} // if
 	} // summarizeResult
 
 	/**
@@ -704,9 +761,13 @@ public class CollaborativeFiltering extends DatabaseOperation {
 	 */
 	public void predictRating(String userId, String businessId)
 			throws Exception {
+		System.out.println("predictRating: userId=" + userId + " businessId="
+				+ businessId);
 		BasicDBObject filter = new BasicDBObject();
-		filter.put(CollectionReview.KEY_USER_ID, userId);
-		filter.put(CollectionReview.KEY_BUSINESS_ID, businessId);
+		if (userId != null)
+			filter.put(CollectionReview.KEY_USER_ID, userId);
+		if (businessId != null)
+			filter.put(CollectionReview.KEY_BUSINESS_ID, businessId);
 		_predictRating(filter);
 	} // predictRating
 
@@ -717,6 +778,7 @@ public class CollaborativeFiltering extends DatabaseOperation {
 	 * @throws Exception
 	 */
 	public void predictRating() throws Exception {
+		System.out.println("predictRating");
 		_predictRating(null);
 	} // predictRating
 
