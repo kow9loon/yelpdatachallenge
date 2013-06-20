@@ -17,13 +17,21 @@ public class AnalyzeData {
 	 * 
 	 */
 	public static void main(String[] args) {
+		
+		// final String USER_ID = "rLtl8ZkDX5vH5nAx9C3q5Q";
+		// final String BUSINESS_ID = "9yKzy9PApeiPPOUJEtnvkg";
+		final String USER_ID = null;
+		final String BUSINESS_ID = null;
+		
 		System.out.println("start");
 		CollaborativeFiltering recommendation = new CollaborativeFiltering();
 		try {
 			recommendation.openDatabase();
-			// recommendation.predictRating("1ieuYcKS7zeAv_U15AB13A",
-			// "hW0Ne_HTHEAgGF1rAdmR-g");
-			recommendation.predictRating();
+			if ((USER_ID != null) || (BUSINESS_ID != null)) {
+				recommendation.predictRating(USER_ID, BUSINESS_ID);
+			} else {
+				recommendation.predictRating();
+			} // else
 			recommendation.closeDatabase();
 		} catch (Exception e) {
 			e.printStackTrace();
